@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+marker="$HOME/.config/omarchy/lazydocker-picker-shortcut.disabled"
+
+case "${1:-}" in
+  enable)
+    rm -f "$marker"
+    printf 'Lazydocker host picker enabled for Super+Shift+D.\n'
+    exit 0
+    ;;
+  disable)
+    mkdir -p "${marker%/*}"
+    : > "$marker"
+    printf 'Super+Shift+D restored to Omarchy Docker TUI.\n'
+    exit 0
+    ;;
+  status)
+    if [[ -e "$marker" ]]; then
+      printf 'disabled (runs omarchy-launch-docker-tui)\n'
+    else
+      printf 'enabled (opens Lazydocker host picker)\n'
+    fi
+    exit 0
+    ;;
+  "")
+    ;;
+  *)
+    printf 'Usage: lazydocker-picker-shortcut [enable|disable|status]\n' >&2
+    exit 2
+    ;;
+esac
+
+if [[ -e "$marker" ]]; then
+  exec omarchy-launch-docker-tui
+fi
+
+exec omarchy-shell shell summon rafamedeiros.lazydocker-host-picker '{}'

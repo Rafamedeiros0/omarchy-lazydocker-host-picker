@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "id": "rafamedeiros.lazydocker-host-picker",
+  "name": "Lazydocker Host Picker",
+  "version": "0.1.0",
+  "author": "Rafa Medeiros",
+  "description": "Choose a local or remote Docker host and launch Lazydocker.",
+  "kinds": ["panel"],
+  "entryPoints": {"panel": "Panel.qml"}
+}

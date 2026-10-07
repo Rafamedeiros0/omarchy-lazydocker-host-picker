@@ -1,0 +1,9 @@
+{
+  "hosts": [
+    {
+      "id": "remote-docker",
+      "name": "Remote Docker",
+      "dockerHost": "ssh://docker-user@docker-host.example.invalid"
+    }
+  ]
+}
