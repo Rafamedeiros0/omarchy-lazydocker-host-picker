@@ -1,4 +1,4 @@
-name: QML quality
+name: Plugin quality
 
 on:
   push:
@@ -13,6 +13,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version: stable
+
+      - name: Check Go and shell sources
+        run: ./scripts/check-plugin-quality.sh
 
       - name: Lint and check QML in the pinned toolchain
         run: ./scripts/check-qml-quality.sh
