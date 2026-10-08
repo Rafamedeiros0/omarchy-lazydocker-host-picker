@@ -8,15 +8,35 @@ local_bin="$HOME/.local/bin"
 local_lib="$HOME/.local/lib/lazydocker-host-picker"
 manager_target="$local_bin/lazydocker-picker-integration"
 
-for file in manifest.json Panel.qml docker-ssh-proxy.go docker-ssh-proxy-launcher docker-ssh-proxy-linux-amd64; do
+required_files=(
+  manifest.json
+  Panel.qml
+  PickerWindow.qml
+  PickerHeader.qml
+  PickerHostSection.qml
+  PickerKeyboardHandler.qml
+  docker-ssh-proxy.go
+  docker-ssh-proxy-launcher
+  docker-ssh-proxy-linux-amd64
+)
+for file in "${required_files[@]}"; do
   [[ -f "$plugin_dir/$file" ]] || { printf 'Missing plugin file: %s\n' "$plugin_dir/$file" >&2; exit 1; }
 done
+qml_components=("$plugin_dir"/components/*.qml)
+[[ -f "${qml_components[0]}" ]] || { printf 'Missing QML components in %s/components.\n' "$plugin_dir" >&2; exit 1; }
 [[ -f "$plugin_dir/lazydocker-picker-integration-linux-amd64" ]] || { printf 'Build the integration manager binary first.\n' >&2; exit 1; }
 [[ -f "$plugin_dir/integration/main.go" ]] || { printf 'Missing Go integration manager source.\n' >&2; exit 1; }
 
-install -d "$plugin_target" "$local_bin" "$local_lib/integration"
+install -d "$plugin_target/components" "$local_bin" "$local_lib/integration"
 install -m 0644 "$plugin_dir/manifest.json" "$plugin_target/manifest.json"
 install -m 0644 "$plugin_dir/Panel.qml" "$plugin_target/Panel.qml"
+install -m 0644 "$plugin_dir/PickerWindow.qml" "$plugin_target/PickerWindow.qml"
+install -m 0644 "$plugin_dir/PickerHeader.qml" "$plugin_target/PickerHeader.qml"
+install -m 0644 "$plugin_dir/PickerHostSection.qml" "$plugin_target/PickerHostSection.qml"
+install -m 0644 "$plugin_dir/PickerKeyboardHandler.qml" "$plugin_target/PickerKeyboardHandler.qml"
+for component in "${qml_components[@]}"; do
+  install -m 0644 "$component" "$plugin_target/components/$(basename -- "$component")"
+done
 install -m 0644 "$plugin_dir/docker-ssh-proxy.go" "$plugin_target/docker-ssh-proxy.go"
 install -m 0755 "$plugin_dir/docker-ssh-proxy-launcher" "$plugin_target/docker-ssh-proxy-launcher"
 install -m 0755 "$plugin_dir/docker-ssh-proxy-linux-amd64" "$plugin_target/docker-ssh-proxy-linux-amd64"

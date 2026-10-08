@@ -47,6 +47,7 @@ Make it easy to open Lazydocker on this machine or one of the user's Docker VMs 
 - Local is built in and is not stored among removable remote hosts.
 - The Add Host flow writes valid remote entries to the user config without changing unrelated settings.
 - Document the config format and validate malformed entries with a useful error instead of failing silently.
+- Require unique remote host IDs that start with a letter or number and use only letters, numbers, `.`, `_`, or `-`; reserve `local` and reject duplicate SSH endpoints so row status and edits cannot collide.
 
 ## Non-Goals for First Version
 
@@ -76,6 +77,34 @@ omarchy-shell shell summon rafamedeiros.lazydocker-host-picker '{}'
 ```
 
 The remote-host example is in `config.example.json`; install/copy it to `~/.config/omarchy/lazydocker-host-picker.json` and edit the `hosts` list. The plugin always includes the local Unix socket and reads configured remote Docker endpoints from that file. For SSH hosts, `plugin/docker-ssh-proxy-launcher` runs the bundled Linux amd64 proxy when available and falls back to `go run` otherwise. Before launching a remote, the picker checks that a proxy route, SSH, and Lazydocker are available; failures appear in the picker and leave it open. The fallback needs Go.
+
+### QML layout
+
+`Panel.qml` coordinates plugin lifecycle, notification state, and the picker window. `PickerWindow.qml` composes the floating window, card, and secondary surfaces. `PickerHeader.qml`, `PickerHostSection.qml`, and `PickerKeyboardHandler.qml` split header controls, the host list and notifications, and keyboard flow into focused parts. `HostManager.qml` owns host status, edit and draft state, Docker connection checks, and host mutations. `DockerLauncher.qml` owns local/SSH launches and proxy readiness checks. `HostConfigStore.qml` owns config parsing, validation, atomic writes, and rollback. `ShortcutController.qml` owns shortcut capture and integration commands. Reusable rows and secondary screens live under `plugin/components/`:
+
+- `HostRow.qml` renders and probes a configured host, including edit and remove actions.
+- `HostDraftRow.qml` contains the inline add-host form for one independent draft.
+- `HostConfigStore.qml` owns the user config file and validates host IDs and SSH endpoints.
+- `HostManager.qml` coordinates host status, edits, add-host drafts, and Docker connection checks.
+- `DockerLauncher.qml` starts Lazydocker locally or through the SSH proxy and reports proxy readiness issues.
+- `ShortcutController.qml` handles key capture, conflict checks, and shortcut updates.
+- `RequirementsView.qml`, `ShortcutSettings.qml`, and `NotificationDetails.qml` own their respective secondary UI states.
+
+The installer copies the entry point, window, its focused subcomponents, and the `components/` directory together so local QML imports work in the installed plugin.
+
+### QML development checks
+
+Run `./scripts/check-qml.sh` before handing off QML changes. It selects Qt 6 `qmllint` and `qmlformat`, runs lint across `plugin/`, and verifies that every QML file matches the repository's `.qmlformat.ini`. It prefers `/usr/lib/qt6/bin`; set `QT6_QML_TOOLS_DIR` when the Qt 6 tools are elsewhere. On Arch, format a file with `/usr/lib/qt6/bin/qmlformat -i plugin/PickerWindow.qml`; rerun the check script afterward. `qmllint` is most useful with Quickshell and Omarchy type information available; add import roots as a colon-separated `QML_IMPORT_PATHS` value when they are not in the default QML search path.
+
+After changes to window lifecycle, keyboard behavior, or plugin integration, do a brief smoke check in the Omarchy shell:
+
+1. Rescan or restart the shell if needed, then summon the picker with the command above.
+2. Move selection, enter and leave host management, and close with Escape.
+3. Exercise the changed flow in the running shell and confirm feedback and window state behave as expected.
+
+Use Qt Creator's QML Profiler when a repeatable interaction shows lag or stutter. Profile that interaction with QML debugging/profiling enabled in the host, then inspect the trace for expensive JavaScript, bindings, or signal handlers. It is a diagnostic tool for observed performance issues, not a required step for every change.
+
+The GitHub Actions workflow runs the same check script on pushes and pull requests. It installs the Arch Qt/Quickshell tools and loads Omarchy's `qs.Commons` module for linting.
 
 To preview proxy availability messages in the picker, add the `proxyTest` object from `config.proxy-test.example.json` to `~/.config/omarchy/lazydocker-host-picker.json`, alongside `hosts`. Edit its scenario values and set `enabled` to `true`. This uses the same config file the picker already reads for hosts. Test mode does not launch Lazydocker. Set `enabled` to `false` or remove `proxyTest` to restore normal behavior. In normal mode, the picker checks requirements on open. If any are missing, it shows a dedicated issue screen with one bullet per problem; when everything is ready, it opens the host picker without a readiness message.
 
