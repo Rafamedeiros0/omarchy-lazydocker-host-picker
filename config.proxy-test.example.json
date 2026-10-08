@@ -1,0 +1,10 @@
+{
+  "proxyTest": {
+    "enabled": true,
+    "architecture": "arm64",
+    "bundledBinary": false,
+    "goAvailable": true,
+    "sshAvailable": true,
+    "lazydockerAvailable": true
+  }
+}

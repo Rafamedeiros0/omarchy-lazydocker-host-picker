@@ -32,7 +32,7 @@ case "${1:-}" in
 esac
 
 if [[ -e "$marker" ]]; then
-  exec omarchy-launch-docker-tui
+  exec omarchy-launch-tui --app-id=org.omarchy.lazydocker omarchy-launch-docker-tui
 fi
 
-exec omarchy-shell shell summon rafamedeiros.lazydocker-host-picker '{}'
+exec omarchy-shell shell toggle rafamedeiros.lazydocker-host-picker '{}'

@@ -16,14 +16,19 @@ Make it easy to open Lazydocker on this machine or one of the user's Docker VMs 
 
 ## Functional Requirements
 
-- Use a Quickshell UI consistent with Omarchy; keep the feature self-contained as a user-owned plugin/project rather than modifying packaged Omarchy files.
+- Use Omarchy's shared Quickshell `Color` and `Style` tokens for surfaces, text, accents, borders, spacing, and typography. Do not hard-code theme colors; the picker must follow theme changes without edits or restart when the shell exposes live theme updates.
 - Support the local Docker daemon and named remote hosts.
 - Use SSH-based Docker connections for remote hosts where supported; do not require an unauthenticated TCP Docker API.
 - Do not change the user's active/default Docker context as a side effect.
 - Launch Lazydocker in the user's configured terminal and show actionable feedback if Lazydocker, Docker, or SSH is unavailable.
 - Handle unreachable hosts gracefully; selecting one must not make the picker hang indefinitely.
-- Make host definitions easy to add, remove, and rename without editing the UI logic; store them in a documented user config file.
+- Make host definitions easy to add without editing JSON by hand; store them in a documented user config file.
+- Include a built-in, non-removable Local choice.
 - Provide a keyboard-friendly picker and a cancel/escape path.
+- Show a compact status indicator at the trailing/right edge of each host row. Keep the row label unobstructed; show status text in a tooltip on hover and keyboard focus.
+- Use theme-aware status colors: `Color.accent` for Online, `Color.urgent` for Unreachable, and `Color.muted` for Checking/Unknown. Do not rely on color alone; tooltips include the state and, when available, the Docker server version.
+- Start status checks asynchronously so the picker appears immediately. Bound each probe with a short timeout and keep one slow/offline host from delaying other rows.
+- Provide an Add Host flow with a display name and SSH Docker endpoint/alias. Validate the endpoint and verify Docker connectivity before saving; report useful errors and leave the existing config unchanged on failure.
 - Provide an enable/disable mechanism for shortcut integration. Enabling redirects the existing Lazydocker shortcut to the picker; disabling restores the exact previous shortcut behavior.
 - Do not silently overwrite unrelated keybindings. Preserve the prior binding and make enable/disable idempotent and reversible.
 - Keep enable/disable separate from plugin installation/removal so the picker can remain available through its other launch route.
@@ -38,8 +43,9 @@ Make it easy to open Lazydocker on this machine or one of the user's Docker VMs 
 ## Configuration
 
 - Keep the remote host list in a dedicated user-owned config file, separate from UI code and Omarchy's packaged files.
-- Each host entry should support at least a display name and Docker connection target (prefer an SSH Docker endpoint or SSH alias).
-- Include Local as a built-in choice; remote host entries are user-editable.
+- Each remote host entry supports a display name and SSH Docker endpoint/alias.
+- Local is built in and is not stored among removable remote hosts.
+- The Add Host flow writes valid remote entries to the user config without changing unrelated settings.
 - Document the config format and validate malformed entries with a useful error instead of failing silently.
 
 ## Non-Goals for First Version
@@ -51,7 +57,10 @@ Make it easy to open Lazydocker on this machine or one of the user's Docker VMs 
 ## Acceptance Criteria
 
 - The picker opens from an agreed shortcut/menu entry.
-- Local and confirmed remote hosts appear with useful labels.
+- Local and configured remote hosts appear with useful labels and right-aligned status dots; hover/focus reveals status text.
+- Host checks are asynchronous and time-bounded; a failed remote does not block the picker.
+- The picker follows Omarchy theme changes through shared theme tokens rather than fixed colors.
+- The Add Host flow validates and tests a remote before saving it.
 - Choosing Local opens Lazydocker against the local daemon.
 - Choosing a remote host opens Lazydocker against that host over SSH.
 - The active Docker context remains unchanged before and after either launch.
@@ -66,7 +75,13 @@ The first implementation is a user-owned Omarchy `panel` plugin in `plugin/`. It
 omarchy-shell shell summon rafamedeiros.lazydocker-host-picker '{}'
 ```
 
-The remote-host example is in `config.example.json`; install/copy it to `~/.config/omarchy/lazydocker-host-picker.json` and edit the `hosts` list. The plugin always includes the local Unix socket and reads configured remote Docker endpoints from that file. For SSH hosts, it uses `plugin/docker-ssh-proxy.py` to bridge a local Unix socket to `ssh host docker system dial-stdio`.
+The remote-host example is in `config.example.json`; install/copy it to `~/.config/omarchy/lazydocker-host-picker.json` and edit the `hosts` list. The plugin always includes the local Unix socket and reads configured remote Docker endpoints from that file. For SSH hosts, `plugin/docker-ssh-proxy-launcher` runs the bundled Linux amd64 proxy when available and falls back to `go run` otherwise. Before launching a remote, the picker checks that a proxy route, SSH, and Lazydocker are available; failures appear in the picker and leave it open. The fallback needs Go.
+
+To preview proxy availability messages in the picker, add the `proxyTest` object from `config.proxy-test.example.json` to `~/.config/omarchy/lazydocker-host-picker.json`, alongside `hosts`. Edit its scenario values and set `enabled` to `true`. This uses the same config file the picker already reads for hosts. Test mode does not launch Lazydocker. Set `enabled` to `false` or remove `proxyTest` to restore normal behavior. In normal mode, the picker checks requirements on open. If any are missing, it shows a dedicated issue screen with one bullet per problem; when everything is ready, it opens the host picker without a readiness message.
+
+Example scenarios: `architecture: "x86_64"`, `bundledBinary: true` previews the ready state; `architecture: "arm64"`, `goAvailable: true` previews the ready state; `architecture: "arm64"`, `goAvailable: false` previews the Go requirement. Set `sshAvailable` or `lazydockerAvailable` to `false` to preview those issues. Multiple false values show multiple bullets together.
+
+During local QML development, if the visible picker still shows an older UI after syncing the plugin and rescanning, run `omarchy-restart-shell` before reopening it; the running shell can retain an old panel instance across plugin rescans.
 
 The SSH proxy bridges Docker's `system dial-stdio` transport through a local Unix socket for Lazydocker. This supports SSH environments where forwarding a remote Unix socket directly is unavailable, without changing the active Docker context.
 
@@ -74,9 +89,15 @@ The SSH proxy bridges Docker's `system dial-stdio` transport through a local Uni
 
 No bar widget is added. The picker can also be summoned directly through shell IPC.
 
-## Follow-up Requirements
+## Current UI Improvements
 
-- Identify the existing Lazydocker key combination and command before implementing reversible shortcut integration.
-- Decide whether to add a menu route or bar button; current recommendation is menu first, no permanent bar widget.
-- Confirm the third VM's SSH alias; `other-docker-host` currently has no Docker CLI.
-- Consider preflight/connection status checks and bounded timeouts after the basic picker launches reliably.
+- The picker now uses Omarchy `Color` and `Style` tokens for live theme-aware colors, typography, spacing, and rounding.
+- Host rows use theme-token card surfaces in both View and Edit modes. Hover or keyboard selection gets a stronger theme-accent fill/border. A single colored status dot sits before the host name; the connection target is on line two. Docker version and the redundant "Online" label are omitted.
+- Docker health checks run asynchronously per host with a six-second timeout. View mode shows Local and online remotes; Edit mode lists every configured host, including offline ones, with an offline-count badge on the Edit icon.
+- Press `E` or click the right-aligned pencil icon to enter host-management mode; hover reveals its label. The icon changes to a return arrow while editing. Changes apply immediately.
+- Local stays fixed in Edit mode. Each remote row exposes an editable name and SSH endpoint on separate lines, with the status dot beside the name. An icon-only Save control tests Docker access before applying changes; the destructive-color trash control remains separate and confirmed.
+- Each **+** click appends an independent inline host draft after the saved hosts. Every draft has its own name, SSH endpoint, Save, and Remove controls; Remove discards only that draft. Save tests Docker connectivity before persisting that host, with checks serialized while other drafts remain editable. Returning to View uses a two-click warning to discard all remaining drafts.
+- The picker reserves a stable card height across view/edit modes to minimize layout movement.
+- The local row remains selectable to preserve Omarchy's privilege-gated local Docker launcher, even if the unprivileged status probe cannot access the daemon.
+- Success, error, and connection-progress feedback appears in a reserved toast slot below the host list (and below the inline new-host row when open). It does not shift the host rows. Long notices include **Details** with wrapped, scrollable text; success notices auto-dismiss, while errors remain until dismissed.
+- The third VM's SSH alias is still unknown; it can be added later through the host flow.

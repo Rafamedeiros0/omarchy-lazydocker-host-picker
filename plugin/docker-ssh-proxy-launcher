@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+set -e
+
+plugin_dir="$(cd -- "$(dirname -- "$0")" && pwd)"
+architecture="$(uname -m)"
+binary="$plugin_dir/docker-ssh-proxy-linux-amd64"
+source_file="$plugin_dir/docker-ssh-proxy.go"
+
+	if [[ "${1:-}" == "--check" ]]; then
+		if [[ "$#" -ne 1 ]]; then
+			echo "Usage: $0 --check" >&2
+			exit 2
+		fi
+		issues=()
+		if [[ ! ( "$architecture" == "x86_64" && -x "$binary" ) ]]; then
+			if ! command -v go >/dev/null 2>&1; then
+				if [[ "$architecture" == "x86_64" ]]; then
+					issues+=("Docker SSH proxy binary is unavailable, and Go is required as a fallback.")
+				else
+					issues+=("Go is required to build the Docker SSH proxy on $architecture.")
+				fi
+			elif [[ ! -f "$source_file" ]]; then
+				issues+=("Docker SSH proxy source is missing.")
+			fi
+		fi
+		if ! command -v ssh >/dev/null 2>&1; then
+			issues+=("OpenSSH is not installed.")
+		fi
+		if ! command -v lazydocker >/dev/null 2>&1; then
+			issues+=("Lazydocker is not installed.")
+		fi
+		if (( ${#issues[@]} > 0 )); then
+			printf '%s\n' "${issues[@]}" >&2
+			exit 127
+		fi
+		exit 0
+	fi
+
+if [[ "$architecture" == "x86_64" && -x "$binary" ]]; then
+	exec "$binary" "$@"
+fi
+
+if command -v go >/dev/null 2>&1; then
+	exec go run "$source_file" "$@"
+fi
+
+if [[ "$architecture" == "x86_64" ]]; then
+	echo "Docker SSH proxy binary is unavailable; Go is required as a fallback" >&2
+else
+	echo "Go is required to run the Docker SSH proxy on $architecture" >&2
+fi
+exit 127
