@@ -92,11 +92,11 @@ The remote-host example is in `config.example.json`; install/copy it to `~/.conf
 
 The installer copies the entry point, window, its focused subcomponents, and the `components/` directory together so local QML imports work in the installed plugin.
 
-### QML development checks
+### Plugin development checks
 
-Run `./scripts/check-qml-quality.sh` before handing off QML changes. CI and the pre-commit hook use this same entry point. With a working Docker daemon, it builds and reuses the pinned Arch toolchain from `scripts/qml-quality.Dockerfile`, then runs with the pinned Omarchy commit. Without a working daemon, it uses installed Qt tools and Omarchy types from `OMARCHY_QML_COMMONS_DIR`, `OMARCHY_PATH`, or `/usr/share/omarchy`, then falls back to the pinned Omarchy checkout. The script prefers Qt 6 tools in `/usr/lib/qt6/bin`; set `QT6_QML_TOOLS_DIR` when they are elsewhere. On Arch, format a file with `/usr/lib/qt6/bin/qmlformat -i plugin/PickerWindow.qml`, then rerun the quality script.
+Run `./scripts/check-plugin-quality.sh` and `./scripts/check-qml-quality.sh` before handing off plugin changes. CI and the pre-commit hook use these same entry points. The plugin check runs Go tests and vet, checks Go formatting, and parses the shell scripts. The QML check uses a pinned Arch toolchain and pinned Omarchy type context in CI. Locally, with a working Docker daemon, it builds and reuses that toolchain from `scripts/qml-quality.Dockerfile`; without Docker, it uses installed Qt tools and Omarchy types from `OMARCHY_QML_COMMONS_DIR`, `OMARCHY_PATH`, or `/usr/share/omarchy`, then falls back to the pinned Omarchy checkout. It prefers Qt 6 tools in `/usr/lib/qt6/bin`; set `QT6_QML_TOOLS_DIR` when they are elsewhere. On Arch, format a file with `/usr/lib/qt6/bin/qmlformat -i plugin/PickerWindow.qml`, then rerun the quality script.
 
-To block commits when QML lint or formatting fails, install Lefthook and its repository hook once:
+To block commits when these checks fail, install Lefthook and its repository hook once:
 
 ```sh
 go install github.com/evilmartians/lefthook/v2@v2.1.14

@@ -1,4 +1,6 @@
 pre-commit:
   jobs:
+    - name: plugin-quality
+      run: ./scripts/check-plugin-quality.sh
     - name: qml-quality
       run: ./scripts/check-qml-quality.sh
