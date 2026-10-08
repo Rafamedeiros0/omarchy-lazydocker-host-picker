@@ -1,5 +1,6 @@
 import QtQuick
 import Quickshell.Io
+import "HostConfigModel.js" as HostConfigModel
 import qs.Commons
 
 Item {
@@ -155,11 +156,7 @@ Item {
         return hostStatuses[host.id] && hostStatuses[host.id].status === "online";
     }
     function normalizeEndpoint(raw) {
-        var endpoint = String(raw || "").trim();
-        if (/^[A-Za-z0-9_.-]+$/.test(endpoint))
-            endpoint = "ssh://" + endpoint;
-
-        return /^ssh:\/\/[^/\s?#]+$/.test(endpoint) ? endpoint : "";
+        return HostConfigModel.normalizeEndpoint(raw);
     }
     function offlineHostCount() {
         var count = 0;
