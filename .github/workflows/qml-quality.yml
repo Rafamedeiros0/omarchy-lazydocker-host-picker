@@ -11,23 +11,8 @@ permissions:
 jobs:
   qml-check:
     runs-on: ubuntu-latest
-    container:
-      image: archlinux:latest
     steps:
-      - name: Install Git for checkout
-        run: pacman -Syu --noconfirm git
-
       - uses: actions/checkout@v7
 
-      - name: Install Qt and Quickshell tooling
-        run: pacman -S --needed --noconfirm qt6-declarative quickshell
-
-      - name: Load Omarchy QML type information
-        run: |
-          git clone --depth 1 --branch quattro https://github.com/omacom/omarchy.git /tmp/omarchy
-          mkdir -p /tmp/qml-imports/qs
-          ln -s /tmp/omarchy/shell/Commons /tmp/qml-imports/qs/Commons
-          echo 'QML_IMPORT_PATHS=/tmp/qml-imports' >> "$GITHUB_ENV"
-
-      - name: Lint and check QML formatting
-        run: ./scripts/check-qml.sh
+      - name: Lint and check QML in the pinned toolchain
+        run: ./scripts/check-qml-quality.sh

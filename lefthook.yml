@@ -1,0 +1,4 @@
+pre-commit:
+  jobs:
+    - name: qml-quality
+      run: ./scripts/check-qml-quality.sh

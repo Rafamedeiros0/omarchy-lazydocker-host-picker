@@ -94,7 +94,16 @@ The installer copies the entry point, window, its focused subcomponents, and the
 
 ### QML development checks
 
-Run `./scripts/check-qml.sh` before handing off QML changes. It selects Qt 6 `qmllint` and `qmlformat`, runs lint across `plugin/`, and verifies that every QML file matches the repository's `.qmlformat.ini`. It prefers `/usr/lib/qt6/bin`; set `QT6_QML_TOOLS_DIR` when the Qt 6 tools are elsewhere. On Arch, format a file with `/usr/lib/qt6/bin/qmlformat -i plugin/PickerWindow.qml`; rerun the check script afterward. `qmllint` is most useful with Quickshell and Omarchy type information available; add import roots as a colon-separated `QML_IMPORT_PATHS` value when they are not in the default QML search path.
+Run `./scripts/check-qml-quality.sh` before handing off QML changes. CI and the pre-commit hook use this same entry point. With a working Docker daemon, it builds and reuses the pinned Arch toolchain from `scripts/qml-quality.Dockerfile`, then runs with the pinned Omarchy commit. Without a working daemon, it uses installed Qt tools and Omarchy types from `OMARCHY_QML_COMMONS_DIR`, `OMARCHY_PATH`, or `/usr/share/omarchy`, then falls back to the pinned Omarchy checkout. The script prefers Qt 6 tools in `/usr/lib/qt6/bin`; set `QT6_QML_TOOLS_DIR` when they are elsewhere. On Arch, format a file with `/usr/lib/qt6/bin/qmlformat -i plugin/PickerWindow.qml`, then rerun the quality script.
+
+To block commits when QML lint or formatting fails, install Lefthook and its repository hook once:
+
+```sh
+go install github.com/evilmartians/lefthook/v2@v2.1.14
+lefthook install
+```
+
+This requires Go 1.26 or newer. The same check can be run manually with `lefthook run pre-commit` or `./scripts/check-qml-quality.sh`.
 
 After changes to window lifecycle, keyboard behavior, or plugin integration, do a brief smoke check in the Omarchy shell:
 
@@ -104,7 +113,7 @@ After changes to window lifecycle, keyboard behavior, or plugin integration, do 
 
 Use Qt Creator's QML Profiler when a repeatable interaction shows lag or stutter. Profile that interaction with QML debugging/profiling enabled in the host, then inspect the trace for expensive JavaScript, bindings, or signal handlers. It is a diagnostic tool for observed performance issues, not a required step for every change.
 
-The GitHub Actions workflow runs the same check script on pushes and pull requests. It installs the Arch Qt/Quickshell tools and loads Omarchy's `qs.Commons` module for linting.
+The GitHub Actions workflow runs `scripts/check-qml-quality.sh` on an Ubuntu runner. The script builds the same pinned Arch toolchain used for local checks and installs Qt and Quickshell from the matching Arch package snapshot.
 
 To preview proxy availability messages in the picker, add the `proxyTest` object from `config.proxy-test.example.json` to `~/.config/omarchy/lazydocker-host-picker.json`, alongside `hosts`. Edit its scenario values and set `enabled` to `true`. This uses the same config file the picker already reads for hosts. Test mode does not launch Lazydocker. Set `enabled` to `false` or remove `proxyTest` to restore normal behavior. In normal mode, the picker checks requirements on open. If any are missing, it shows a dedicated issue screen with one bullet per problem; when everything is ready, it opens the host picker without a readiness message.
 
