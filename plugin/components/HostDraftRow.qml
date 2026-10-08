@@ -11,7 +11,7 @@ Rectangle {
     required property string draftId
     required property string draftName
     required property int index
-    property bool isSaving: controller.checkingNewHost && controller.checkingDraftId === String(draftId)
+    property bool isSaving: draftRow.controller.checkingNewHost && draftRow.controller.checkingDraftId === String(draftId)
 
     function focusEndpoint() {
         draftEndpointField.forceActiveFocus();
@@ -20,9 +20,9 @@ Rectangle {
         draftNameField.forceActiveFocus();
     }
 
-    border.color: draftRow.isSaving ? Color.accent : controller.panelBorder
+    border.color: draftRow.isSaving ? Color.accent : draftRow.controller.panelBorder
     border.width: 1
-    color: controller.hoverBackground
+    color: draftRow.controller.hoverBackground
     height: Style.space(68)
     radius: Style.space(10)
     width: parent.width
@@ -35,7 +35,7 @@ Rectangle {
         y: 0
 
         Rectangle {
-            color: draftRow.draftError !== "" ? controller.hostManagerApi.statusColor("unreachable") : (draftRow.isSaving ? controller.hostManagerApi.statusColor("checking") : controller.hostManagerApi.statusColor("unknown"))
+            color: draftRow.draftError !== "" ? draftRow.controller.hostManagerApi.statusColor("unreachable") : (draftRow.isSaving ? draftRow.controller.hostManagerApi.statusColor("checking") : draftRow.controller.hostManagerApi.statusColor("unknown"))
             height: width
             radius: width / 2
             width: Style.space(10)
@@ -54,7 +54,7 @@ Rectangle {
                 TextField {
                     id: draftNameField
 
-                    color: controller.panelForeground
+                    color: draftRow.controller.panelForeground
                     enabled: !draftRow.isSaving
                     font.family: Style.font.family
                     font.pixelSize: Style.font.bodySmall
@@ -65,15 +65,15 @@ Rectangle {
                     width: parent.width
 
                     background: Rectangle {
-                        border.color: draftNameField.activeFocus ? Color.accent : controller.panelBorder
+                        border.color: draftNameField.activeFocus ? Color.accent : draftRow.controller.panelBorder
                         border.width: 1
-                        color: controller.panelBackground
+                        color: draftRow.controller.panelBackground
                         radius: Style.space(7)
                     }
 
-                    Keys.onEscapePressed: controller.hostManagerApi.handleAddEscape(draftRow.draftId)
+                    Keys.onEscapePressed: draftRow.controller.hostManagerApi.handleAddEscape(draftRow.draftId)
                     onAccepted: draftEndpointField.forceActiveFocus()
-                    onTextChanged: controller.hostManagerApi.drafts.setProperty(draftRow.index, "draftName", text)
+                    onTextChanged: draftRow.controller.hostManagerApi.drafts.setProperty(draftRow.index, "draftName", text)
                 }
             }
             Row {
@@ -83,7 +83,7 @@ Rectangle {
                 TextField {
                     id: draftEndpointField
 
-                    color: controller.panelForeground
+                    color: draftRow.controller.panelForeground
                     enabled: !draftRow.isSaving
                     font.family: Style.font.family
                     font.pixelSize: Style.font.caption
@@ -94,15 +94,15 @@ Rectangle {
                     width: parent.width
 
                     background: Rectangle {
-                        border.color: draftEndpointField.activeFocus ? Color.accent : controller.panelBorder
+                        border.color: draftEndpointField.activeFocus ? Color.accent : draftRow.controller.panelBorder
                         border.width: 1
-                        color: controller.panelBackground
+                        color: draftRow.controller.panelBackground
                         radius: Style.space(7)
                     }
 
-                    Keys.onEscapePressed: controller.hostManagerApi.handleAddEscape(draftRow.draftId)
-                    onAccepted: controller.hostManagerApi.addHost(draftRow)
-                    onTextChanged: controller.hostManagerApi.drafts.setProperty(draftRow.index, "draftEndpoint", text)
+                    Keys.onEscapePressed: draftRow.controller.hostManagerApi.handleAddEscape(draftRow.draftId)
+                    onAccepted: draftRow.controller.hostManagerApi.addHost(draftRow)
+                    onTextChanged: draftRow.controller.hostManagerApi.drafts.setProperty(draftRow.index, "draftEndpoint", text)
                 }
             }
         }
@@ -121,10 +121,10 @@ Rectangle {
                 Rectangle {
                     ToolTip.delay: 450
                     ToolTip.text: "Test connection and save host"
-                    ToolTip.visible: draftSaveMouse.containsMouse && !controller.showingRequirementIssues
+                    ToolTip.visible: draftSaveMouse.containsMouse && !draftRow.controller.showingRequirementIssues
                     border.color: Color.accent
                     border.width: 1
-                    color: draftSaveMouse.containsMouse ? controller.hoverBackground : controller.panelBackground
+                    color: draftSaveMouse.containsMouse ? draftRow.controller.hoverBackground : draftRow.controller.panelBackground
                     height: width
                     radius: Style.space(7)
                     width: Style.space(34)
@@ -148,16 +148,16 @@ Rectangle {
                         id: draftSaveMouse
 
                         anchors.fill: parent
-                        enabled: !controller.checkingNewHost
+                        enabled: !draftRow.controller.checkingNewHost
                         hoverEnabled: true
 
-                        onClicked: controller.hostManagerApi.addHost(draftRow)
+                        onClicked: draftRow.controller.hostManagerApi.addHost(draftRow)
                     }
                 }
                 Rectangle {
                     ToolTip.delay: 450
                     ToolTip.text: "Discard this draft"
-                    ToolTip.visible: draftRemoveMouse.containsMouse && !controller.showingRequirementIssues
+                    ToolTip.visible: draftRemoveMouse.containsMouse && !draftRow.controller.showingRequirementIssues
                     border.color: Color.urgent
                     border.width: 1
                     color: draftRemoveMouse.containsMouse ? Qt.rgba(Color.urgent.r, Color.urgent.g, Color.urgent.b, 0.18) : "transparent"
@@ -178,7 +178,7 @@ Rectangle {
                         anchors.fill: parent
                         hoverEnabled: true
 
-                        onClicked: controller.hostManagerApi.removeHostDraft(draftRow.draftId)
+                        onClicked: draftRow.controller.hostManagerApi.removeHostDraft(draftRow.draftId)
                     }
                 }
             }

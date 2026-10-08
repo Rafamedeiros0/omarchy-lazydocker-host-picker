@@ -15,6 +15,10 @@ command -v node >/dev/null 2>&1 || {
   echo 'Node.js is required to test the host configuration model.' >&2
   exit 1
 }
+command -v shellcheck >/dev/null 2>&1 || {
+  echo 'ShellCheck is required to analyze the plugin shell scripts.' >&2
+  exit 1
+}
 
 mapfile -d '' go_files < <(find "$repo_dir/plugin" -type f -name '*.go' -print0 | sort -z)
 if ((${#go_files[@]} == 0)); then
@@ -43,5 +47,6 @@ shell_files+=(
 for shell_file in "${shell_files[@]}"; do
   bash -n "$shell_file"
 done
+shellcheck --severity=warning --shell=bash "${shell_files[@]}"
 
-printf 'Go tests, vet, formatting, and shell syntax checks passed.\n'
+printf 'Go tests, vet, formatting, shell syntax, and ShellCheck passed.\n'

@@ -17,8 +17,14 @@ jobs:
       - uses: actions/setup-go@v6
         with:
           go-version: stable
+          cache: false
 
-      - name: Check Go and shell sources
+      - name: Install ShellCheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends shellcheck
+
+      - name: Check Go, JavaScript, and shell sources
         run: ./scripts/check-plugin-quality.sh
 
       - name: Lint and check QML in the pinned toolchain

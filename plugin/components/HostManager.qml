@@ -71,7 +71,7 @@ Item {
         pendingAddReturn = false;
         setError("");
         Qt.callLater(function () {
-            var row = pickerWindow.draftRowsRepeater.itemAt(pickerWindow.draftRowsRepeater.count - 1);
+            var row = root.pickerWindow.draftRowsRepeater.itemAt(root.pickerWindow.draftRowsRepeater.count - 1);
             if (row)
                 row.focusName();
         });
@@ -104,8 +104,8 @@ Item {
         setError("");
     }
     function draftEndpointInUse(endpoint, exceptId) {
-        for (var i = 0; i < pickerWindow.draftRowsRepeater.count; i++) {
-            var row = pickerWindow.draftRowsRepeater.itemAt(i);
+        for (var i = 0; i < root.pickerWindow.draftRowsRepeater.count; i++) {
+            var row = root.pickerWindow.draftRowsRepeater.itemAt(i);
             if (row && String(row.draftId) !== String(exceptId) && normalizeEndpoint(row.draftEndpoint).toLowerCase() === endpoint.toLowerCase())
                 return true;
         }
@@ -127,8 +127,8 @@ Item {
     }
     function handleEditEscape() {
         var hasUnsavedEdits = false;
-        for (var i = 0; i < pickerWindow.hostRowsRepeater.count; i++) {
-            var row = pickerWindow.hostRowsRepeater.itemAt(i);
+        for (var i = 0; i < root.pickerWindow.hostRowsRepeater.count; i++) {
+            var row = root.pickerWindow.hostRowsRepeater.itemAt(i);
             if (!row)
                 continue;
 
@@ -341,7 +341,7 @@ Item {
         }
 
         onExited: function (exitCode) {
-            root.addHostTimeout.stop();
+            addHostTimeout.stop();
             root.checkingNewHost = false;
             var draftId = root.checkingDraftId;
             var name = root.checkingDraftName;
@@ -360,8 +360,8 @@ Item {
             } else {
                 var detail = String(addHostStderr.text || "").trim().split("\n")[0] || "Could not connect to Docker at that SSH endpoint.";
                 root.setError(detail);
-                for (var i = 0; i < pickerWindow.draftRowsRepeater.count; i++) {
-                    var row = pickerWindow.draftRowsRepeater.itemAt(i);
+                for (var i = 0; i < root.pickerWindow.draftRowsRepeater.count; i++) {
+                    var row = root.pickerWindow.draftRowsRepeater.itemAt(i);
                     if (row && String(row.draftId) === draftId) {
                         hostDraftModel.setProperty(row.index, "draftError", detail);
                         break;
@@ -381,8 +381,8 @@ Item {
 
             root.addHostTimedOut = true;
             root.setError("Connection timed out. Check the SSH target and try again.");
-            for (var i = 0; i < pickerWindow.draftRowsRepeater.count; i++) {
-                var row = pickerWindow.draftRowsRepeater.itemAt(i);
+            for (var i = 0; i < root.pickerWindow.draftRowsRepeater.count; i++) {
+                var row = root.pickerWindow.draftRowsRepeater.itemAt(i);
                 if (row && String(row.draftId) === root.checkingDraftId) {
                     hostDraftModel.setProperty(row.index, "draftError", "Connection timed out. Check the SSH target and try again.");
                     break;

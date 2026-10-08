@@ -6,18 +6,18 @@ import qs.Commons
 Rectangle {
     id: hostRow
 
-    property bool chosen: controller.selectedIndex === index
+    property bool chosen: hostRow.controller.selectedIndex === index
     property var controller
     property bool editDirty: editName !== modelData.name || editEndpoint !== modelData.dockerHost
     property string editEndpoint: modelData.dockerHost
     property string editName: modelData.name
     property bool editTimedOut: false
-    property bool editable: controller.manageHosts && modelData.id !== "local"
+    property bool editable: hostRow.controller.manageHosts && modelData.id !== "local"
     property bool highlighted: chosen || hovered
     property bool hovered: rowHover.hovered
     required property int index
     required property var modelData
-    property bool removable: controller.manageHosts && modelData.id !== "local"
+    property bool removable: hostRow.controller.manageHosts && modelData.id !== "local"
     property bool savingEdit: false
     property string serverVersion: ""
     property string status: "unknown"
@@ -26,24 +26,24 @@ Rectangle {
 
     function saveHostEdits() {
         var nextName = editName.trim();
-        var nextEndpoint = controller.hostManagerApi.normalizeEndpoint(editEndpoint);
+        var nextEndpoint = hostRow.controller.hostManagerApi.normalizeEndpoint(editEndpoint);
         if (!nextName) {
-            controller.errorText = "Enter a host name.";
+            hostRow.controller.errorText = "Enter a host name.";
             editNameField.forceActiveFocus();
             return;
         }
         if (!nextEndpoint) {
-            controller.errorText = "Use an SSH alias or endpoint, e.g. host or ssh://user@host.";
+            hostRow.controller.errorText = "Use an SSH alias or endpoint, e.g. host or ssh://user@host.";
             editEndpointField.forceActiveFocus();
             return;
         }
-        if (controller.hostManagerApi.endpointInUse(nextEndpoint, modelData.id)) {
-            controller.errorText = "That SSH endpoint is already assigned to another host.";
+        if (hostRow.controller.hostManagerApi.endpointInUse(nextEndpoint, modelData.id)) {
+            hostRow.controller.errorText = "That SSH endpoint is already assigned to another host.";
             editEndpointField.forceActiveFocus();
             return;
         }
         editEndpoint = nextEndpoint;
-        controller.errorText = "";
+        hostRow.controller.errorText = "";
         savingEdit = true;
         editTimeout.restart();
         editProbe.command = ["docker", "--host", nextEndpoint, "info", "--format", "{{.ServerVersion}}"];
@@ -54,7 +54,7 @@ Rectangle {
     border.width: hostRow.highlighted ? Math.max(1, Style.selectedBorderWidth) : Math.max(1, Style.normalBorderWidth)
     color: hostRow.chosen ? Style.selectedFillFor(Color.foreground, Color.accent, Color.urgent) : (hostRow.hovered ? Style.hoverFillFor(Color.foreground, Color.accent, Color.urgent) : Style.normalFillFor(Color.foreground, Color.accent, Color.urgent))
     height: Style.space(68)
-    opacity: modelData.id !== "local" && status !== "online" && !controller.manageHosts ? 0.58 : 1
+    opacity: modelData.id !== "local" && status !== "online" && !hostRow.controller.manageHosts ? 0.58 : 1
     radius: Style.space(10)
     width: parent.width
 
@@ -62,7 +62,7 @@ Rectangle {
         editName = modelData.name;
         editEndpoint = modelData.dockerHost;
         status = "checking";
-        controller.hostManagerApi.updateHostStatus(modelData.id, "checking", "", "");
+        hostRow.controller.hostManagerApi.updateHostStatus(modelData.id, "checking", "", "");
         probe.command = modelData.id === "local" ? ["docker", "--host", "unix:///var/run/docker.sock", "info", "--format", "{{.ServerVersion}}"] : ["docker", "--host", modelData.dockerHost, "info", "--format", "{{.ServerVersion}}"];
         probe.running = true;
     }
@@ -92,7 +92,7 @@ Rectangle {
             hostRow.status = exitCode === 0 ? "online" : "unreachable";
             hostRow.serverVersion = String(probeStdout.text || "").trim();
             hostRow.statusDetail = exitCode === 0 ? "" : String(probeStderr.text || "").trim().split("\n")[0];
-            controller.hostManagerApi.updateHostStatus(hostRow.modelData.id, hostRow.status, hostRow.serverVersion, hostRow.statusDetail);
+            hostRow.controller.hostManagerApi.updateHostStatus(hostRow.modelData.id, hostRow.status, hostRow.serverVersion, hostRow.statusDetail);
         }
     }
     Timer {
@@ -105,7 +105,7 @@ Rectangle {
             hostRow.timedOut = true;
             hostRow.status = "unreachable";
             hostRow.statusDetail = "Check timed out";
-            controller.hostManagerApi.updateHostStatus(hostRow.modelData.id, hostRow.status, "", hostRow.statusDetail);
+            hostRow.controller.hostManagerApi.updateHostStatus(hostRow.modelData.id, hostRow.status, "", hostRow.statusDetail);
             probe.running = false;
         }
     }
@@ -131,10 +131,10 @@ Rectangle {
                 return;
             }
             if (exitCode === 0) {
-                controller.hostManagerApi.updateRemoteHost(hostRow.modelData, hostRow.editName.trim(), hostRow.editEndpoint, String(editStdout.text || "").trim());
+                hostRow.controller.hostManagerApi.updateRemoteHost(hostRow.modelData, hostRow.editName.trim(), hostRow.editEndpoint, String(editStdout.text || "").trim());
             } else {
                 var detail = String(editStderr.text || "").trim().split("\n")[0];
-                controller.errorText = detail || "Could not connect to Docker at that SSH endpoint.";
+                hostRow.controller.errorText = detail || "Could not connect to Docker at that SSH endpoint.";
             }
         }
     }
@@ -147,7 +147,7 @@ Rectangle {
         onTriggered: {
             hostRow.editTimedOut = true;
             hostRow.savingEdit = false;
-            controller.errorText = "Connection timed out. Check the SSH target and try again.";
+            hostRow.controller.errorText = "Connection timed out. Check the SSH target and try again.";
             editProbe.running = false;
         }
     }
@@ -165,9 +165,9 @@ Rectangle {
             id: rowStatusDot
 
             ToolTip.delay: 450
-            ToolTip.text: controller.hostManagerApi.statusDescription(hostRow.status, hostRow.serverVersion, hostRow.statusDetail)
-            ToolTip.visible: (hostRow.hovered || hostRow.chosen) && !controller.showingRequirementIssues
-            color: controller.hostManagerApi.statusColor(hostRow.status)
+            ToolTip.text: hostRow.controller.hostManagerApi.statusDescription(hostRow.status, hostRow.serverVersion, hostRow.statusDetail)
+            ToolTip.visible: (hostRow.hovered || hostRow.chosen) && !hostRow.controller.showingRequirementIssues
+            color: hostRow.controller.hostManagerApi.statusColor(hostRow.status)
             height: width
             radius: width / 2
             width: Style.space(10)
@@ -187,7 +187,7 @@ Rectangle {
                 width: parent.width
 
                 Text {
-                    color: controller.panelForeground
+                    color: hostRow.controller.panelForeground
                     elide: Text.ElideRight
                     font.family: Style.font.family
                     font.pixelSize: Style.font.body
@@ -224,8 +224,8 @@ Rectangle {
                 TextField {
                     id: editNameField
 
-                    color: controller.panelForeground
-                    enabled: !hostRow.savingEdit && !controller.checkingNewHost
+                    color: hostRow.controller.panelForeground
+                    enabled: !hostRow.savingEdit && !hostRow.controller.checkingNewHost
                     font.family: Style.font.family
                     font.pixelSize: Style.font.bodySmall
                     height: parent.height
@@ -235,13 +235,13 @@ Rectangle {
                     width: parent.width
 
                     background: Rectangle {
-                        border.color: editNameField.activeFocus ? Color.accent : controller.panelBorder
+                        border.color: editNameField.activeFocus ? Color.accent : hostRow.controller.panelBorder
                         border.width: 1
-                        color: controller.panelBackground
+                        color: hostRow.controller.panelBackground
                         radius: Style.space(7)
                     }
 
-                    Keys.onEscapePressed: controller.hostManagerApi.handleEditEscape()
+                    Keys.onEscapePressed: hostRow.controller.hostManagerApi.handleEditEscape()
                     onAccepted: editEndpointField.forceActiveFocus()
                     onTextChanged: hostRow.editName = text
                 }
@@ -254,8 +254,8 @@ Rectangle {
                 TextField {
                     id: editEndpointField
 
-                    color: controller.panelForeground
-                    enabled: !hostRow.savingEdit && !controller.checkingNewHost
+                    color: hostRow.controller.panelForeground
+                    enabled: !hostRow.savingEdit && !hostRow.controller.checkingNewHost
                     font.family: Style.font.family
                     font.pixelSize: Style.font.caption
                     height: parent.height
@@ -265,13 +265,13 @@ Rectangle {
                     width: parent.width
 
                     background: Rectangle {
-                        border.color: editEndpointField.activeFocus ? Color.accent : controller.panelBorder
+                        border.color: editEndpointField.activeFocus ? Color.accent : hostRow.controller.panelBorder
                         border.width: 1
-                        color: controller.panelBackground
+                        color: hostRow.controller.panelBackground
                         radius: Style.space(7)
                     }
 
-                    Keys.onEscapePressed: controller.hostManagerApi.handleEditEscape()
+                    Keys.onEscapePressed: hostRow.controller.hostManagerApi.handleEditEscape()
                     onAccepted: hostRow.saveHostEdits()
                     onTextChanged: hostRow.editEndpoint = text
                 }
@@ -294,10 +294,10 @@ Rectangle {
 
                     ToolTip.delay: 450
                     ToolTip.text: "Test connection and save"
-                    ToolTip.visible: hostRow.editDirty && editSaveMouse.containsMouse && !controller.showingRequirementIssues
+                    ToolTip.visible: hostRow.editDirty && editSaveMouse.containsMouse && !hostRow.controller.showingRequirementIssues
                     border.color: Color.accent
                     border.width: 1
-                    color: editSaveMouse.containsMouse ? controller.hoverBackground : "transparent"
+                    color: editSaveMouse.containsMouse ? hostRow.controller.hoverBackground : "transparent"
                     height: width
                     opacity: hostRow.editDirty || hostRow.savingEdit ? 1 : 0
                     radius: Style.space(7)
@@ -323,7 +323,7 @@ Rectangle {
                         id: editSaveMouse
 
                         anchors.fill: parent
-                        enabled: hostRow.editable && hostRow.editDirty && !hostRow.savingEdit && !controller.checkingNewHost
+                        enabled: hostRow.editable && hostRow.editDirty && !hostRow.savingEdit && !hostRow.controller.checkingNewHost
                         hoverEnabled: true
 
                         onClicked: hostRow.saveHostEdits()
@@ -333,11 +333,11 @@ Rectangle {
                     id: removeButton
 
                     ToolTip.delay: 450
-                    ToolTip.text: controller.pendingRemovalId === hostRow.modelData.id ? "Click again to confirm removal" : "Remove host"
-                    ToolTip.visible: removeMouse.containsMouse && !controller.showingRequirementIssues
+                    ToolTip.text: hostRow.controller.pendingRemovalId === hostRow.modelData.id ? "Click again to confirm removal" : "Remove host"
+                    ToolTip.visible: removeMouse.containsMouse && !hostRow.controller.showingRequirementIssues
                     border.color: Color.urgent
                     border.width: 1
-                    color: controller.pendingRemovalId === hostRow.modelData.id || removeMouse.containsMouse ? Qt.rgba(Color.urgent.r, Color.urgent.g, Color.urgent.b, 0.18) : "transparent"
+                    color: hostRow.controller.pendingRemovalId === hostRow.modelData.id || removeMouse.containsMouse ? Qt.rgba(Color.urgent.r, Color.urgent.g, Color.urgent.b, 0.18) : "transparent"
                     height: width
                     radius: Style.space(7)
                     visible: hostRow.removable
@@ -348,7 +348,7 @@ Rectangle {
                         color: Color.urgent
                         font.family: Style.font.family
                         font.pixelSize: Style.font.subtitle
-                        text: controller.pendingRemovalId === hostRow.modelData.id ? "!" : "󰆴"
+                        text: hostRow.controller.pendingRemovalId === hostRow.modelData.id ? "!" : "󰆴"
                     }
                     MouseArea {
                         id: removeMouse
@@ -358,10 +358,10 @@ Rectangle {
                         hoverEnabled: true
 
                         onClicked: {
-                            if (controller.pendingRemovalId === hostRow.modelData.id)
-                                controller.hostManagerApi.removeHost(hostRow.modelData);
+                            if (hostRow.controller.pendingRemovalId === hostRow.modelData.id)
+                                hostRow.controller.hostManagerApi.removeHost(hostRow.modelData);
                             else
-                                controller.pendingRemovalId = hostRow.modelData.id;
+                                hostRow.controller.pendingRemovalId = hostRow.modelData.id;
                         }
                     }
                 }
@@ -372,11 +372,11 @@ Rectangle {
         id: rowMouse
 
         anchors.fill: parent
-        enabled: !controller.manageHosts && (hostRow.modelData.id === "local" || hostRow.status === "online")
+        enabled: !hostRow.controller.manageHosts && (hostRow.modelData.id === "local" || hostRow.status === "online")
         hoverEnabled: true
-        z: controller.manageHosts ? 0 : 2
+        z: hostRow.controller.manageHosts ? 0 : 2
 
-        onClicked: controller.launch(hostRow.modelData)
-        onEntered: controller.selectedIndex = hostRow.index
+        onClicked: hostRow.controller.launch(hostRow.modelData)
+        onEntered: hostRow.controller.selectedIndex = hostRow.index
     }
 }
