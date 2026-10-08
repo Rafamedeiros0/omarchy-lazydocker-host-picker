@@ -1,27 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-marker="$HOME/.config/omarchy/lazydocker-picker-shortcut.disabled"
+integration="$HOME/.local/bin/lazydocker-picker-integration"
 
 case "${1:-}" in
-  enable)
-    rm -f "$marker"
-    printf 'Lazydocker host picker enabled for Super+Shift+D.\n'
-    exit 0
-    ;;
-  disable)
-    mkdir -p "${marker%/*}"
-    : > "$marker"
-    printf 'Super+Shift+D restored to Omarchy Docker TUI.\n'
-    exit 0
-    ;;
-  status)
-    if [[ -e "$marker" ]]; then
-      printf 'disabled (runs omarchy-launch-docker-tui)\n'
-    else
-      printf 'enabled (opens Lazydocker host picker)\n'
+  enable|disable|status)
+    if [[ ! -x "$integration" ]]; then
+      printf 'Shortcut integration manager is not installed: %s\n' "$integration" >&2
+      exit 127
     fi
-    exit 0
+    exec "$integration" "$1"
     ;;
   "")
     ;;
@@ -30,9 +18,5 @@ case "${1:-}" in
     exit 2
     ;;
 esac
-
-if [[ -e "$marker" ]]; then
-  exec omarchy-launch-tui --app-id=org.omarchy.lazydocker omarchy-launch-docker-tui
-fi
 
 exec omarchy-shell shell toggle rafamedeiros.lazydocker-host-picker '{}'

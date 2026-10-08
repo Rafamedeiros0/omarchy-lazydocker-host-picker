@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+plugin_dir="$(cd -- "$(dirname -- "$0")" && pwd)"
+local_lib="$HOME/.local/lib/lazydocker-host-picker"
+binary="$plugin_dir/lazydocker-picker-integration-linux-amd64"
+source_dir="$plugin_dir/integration"
+if [[ ! -x "$binary" ]]; then
+  binary="$local_lib/lazydocker-picker-integration-linux-amd64"
+fi
+if [[ ! -f "$source_dir/main.go" ]]; then
+  source_dir="$local_lib/integration"
+fi
+
+if [[ "$(uname -m)" == x86_64 && -x "$binary" ]]; then
+  exec "$binary" "$@"
+fi
+if command -v go >/dev/null 2>&1 && [[ -f "$source_dir/main.go" ]]; then
+  cd "$source_dir"
+  exec env GO111MODULE=off go run main.go "$@"
+fi
+printf 'Shortcut manager binary unavailable; install Go to build it from source.\n' >&2
+exit 127

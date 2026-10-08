@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import Quickshell
 import Quickshell.Io
+import Quickshell.Wayland
 import qs.Commons
 
 Item {
@@ -32,7 +33,18 @@ Item {
   property var viewHosts: []
   property string errorText: ""
   property bool notificationExpanded: false
+  property bool shortcutSettingsOpen: false
+  property bool shortcutCaptureActive: false
+  property bool shortcutInhibitorReady: false
+  property bool shortcutConflictOpen: false
+  property string shortcutCandidate: ""
+  property string shortcutCurrent: ""
+  property string shortcutLast: "SUPER + SHIFT + D"
+  property string shortcutError: ""
+  property string shortcutOperation: ""
+  property var shortcutConflicts: []
 
+  readonly property string integrationPath: Quickshell.env("HOME") + "/.local/bin/lazydocker-picker-integration"
   readonly property string configPath: Quickshell.env("HOME") + "/.config/omarchy/lazydocker-host-picker.json"
   readonly property color panelBackground: Color.popups.background
   readonly property color panelForeground: Color.popups.text
@@ -57,6 +69,7 @@ Item {
     successTimer.stop()
     configFile.reload()
     opened = true
+    refreshShortcutStatus()
     handlePickerOpened()
   }
 
@@ -67,8 +80,90 @@ Item {
   }
 
   function close() {
+    cancelShortcutCapture()
+    shortcutSettingsOpen = false
     opened = false
     addingHost = false
+  }
+
+  function runShortcutManager(action, args) {
+    if (shortcutProcess.running) return
+    shortcutOperation = action
+    shortcutProcess.command = [integrationPath, action].concat(args || [])
+    shortcutProcess.running = true
+  }
+
+  function refreshShortcutStatus() {
+    runShortcutManager("status", [])
+  }
+
+  function openShortcutSettings() {
+    shortcutSettingsOpen = true
+    shortcutError = ""
+    refreshShortcutStatus()
+  }
+
+  function beginShortcutCapture() {
+    shortcutError = ""
+    shortcutConflictOpen = false
+    shortcutCandidate = ""
+    shortcutCaptureActive = true
+    shortcutInhibitorReady = false
+    shortcutInhibitor.enabled = true
+    shortcutCaptureTimeout.restart()
+  }
+
+  function cancelShortcutCapture() {
+    shortcutCaptureTimeout.stop()
+    shortcutInhibitor.enabled = false
+    shortcutCaptureActive = false
+    shortcutInhibitorReady = false
+  }
+
+  function shortcutFromEvent(event) {
+    var modifiers = []
+    if (event.modifiers & Qt.MetaModifier) modifiers.push("SUPER")
+    if (event.modifiers & Qt.ControlModifier) modifiers.push("CTRL")
+    if (event.modifiers & Qt.AltModifier) modifiers.push("ALT")
+    if (event.modifiers & Qt.ShiftModifier) modifiers.push("SHIFT")
+    var key = event.key
+    var name = ""
+    if (key >= Qt.Key_A && key <= Qt.Key_Z) name = String.fromCharCode(key)
+    else if (key >= Qt.Key_0 && key <= Qt.Key_9) name = String.fromCharCode(key)
+    else {
+      var names = ({})
+      names[Qt.Key_Space] = "SPACE"; names[Qt.Key_Tab] = "TAB"
+      names[Qt.Key_Escape] = "ESCAPE"; names[Qt.Key_Return] = "RETURN"
+      names[Qt.Key_Enter] = "RETURN"; names[Qt.Key_Backspace] = "BACKSPACE"
+      names[Qt.Key_Delete] = "DELETE"; names[Qt.Key_Insert] = "INSERT"
+      names[Qt.Key_Home] = "HOME"; names[Qt.Key_End] = "END"
+      names[Qt.Key_PageUp] = "PAGEUP"; names[Qt.Key_PageDown] = "PAGEDOWN"
+      names[Qt.Key_Up] = "UP"; names[Qt.Key_Down] = "DOWN"
+      names[Qt.Key_Left] = "LEFT"; names[Qt.Key_Right] = "RIGHT"
+      names[Qt.Key_Comma] = "COMMA"; names[Qt.Key_Period] = "PERIOD"
+      names[Qt.Key_Slash] = "SLASH"; names[Qt.Key_Semicolon] = "SEMICOLON"
+      names[Qt.Key_Apostrophe] = "APOSTROPHE"; names[Qt.Key_BracketLeft] = "BRACKETLEFT"
+      names[Qt.Key_BracketRight] = "BRACKETRIGHT"; names[Qt.Key_Minus] = "MINUS"
+      names[Qt.Key_Equal] = "EQUAL"; names[Qt.Key_Backslash] = "BACKSLASH"
+      names[Qt.Key_QuoteLeft] = "GRAVE"
+      if (key >= Qt.Key_F1 && key <= Qt.Key_F12) name = "F" + (key - Qt.Key_F1 + 1)
+      else name = names[key] || ""
+    }
+    if (modifiers.length === 0 || name === "") return ""
+    return modifiers.join(" + ") + " + " + name
+  }
+
+  function submitShortcutCandidate(value) {
+    shortcutCandidate = value
+    runShortcutManager("check", [value])
+  }
+
+  function applyShortcutCandidate(replaceConflict) {
+    runShortcutManager("set", replaceConflict ? [shortcutCandidate, "--replace"] : [shortcutCandidate])
+  }
+
+  function resetShortcut() {
+    runShortcutManager("reset", [])
   }
 
   function dismiss() {
@@ -209,21 +304,10 @@ Item {
     var next = Object.assign({}, hostStatuses)
     next[id] = {status: status, version: version, detail: detail}
     hostStatuses = next
-
-    var visible = viewHosts.some(function(host) { return String(host.id) === String(id) })
-    if (status === "unreachable" && visible) {
-      viewHosts = viewHosts.filter(function(host) { return String(host.id) !== String(id) })
-    } else if (status === "online" && !visible) {
-      var host = hosts.find(function(entry) { return String(entry.id) === String(id) })
-      if (host) viewHosts = viewHosts.concat([host])
-    }
   }
 
   function rebuildViewHosts() {
-    viewHosts = hosts.filter(function(host) {
-      var state = hostStatuses[host.id]
-      return host.id === "local" || !state || state.status !== "unreachable"
-    })
+    viewHosts = hosts.slice()
   }
 
   function offlineHostCount() {
@@ -569,8 +653,79 @@ Item {
   }
   property string successText: ""
   Timer { id: successTimer; interval: 3500; onTriggered: root.successText = "" }
+  Timer {
+    id: shortcutCaptureTimeout
+    interval: 1200
+    onTriggered: {
+      if (root.shortcutCaptureActive && !shortcutInhibitor.active) {
+        root.cancelShortcutCapture()
+        root.shortcutError = "Hyprland could not reserve shortcuts for capture. Try again after closing other shortcut-capturing apps."
+      }
+    }
+  }
+  ShortcutInhibitor {
+    id: shortcutInhibitor
+    window: pickerWindow
+    enabled: false
+    onCancelled: {
+      if (root.shortcutCaptureActive) {
+        root.cancelShortcutCapture()
+        root.shortcutError = "Shortcut capture was cancelled by the compositor."
+      }
+    }
+    onActiveChanged: {
+      if (active && root.shortcutCaptureActive) {
+        root.shortcutInhibitorReady = true
+        shortcutCaptureTimeout.stop()
+        captureKeys.forceActiveFocus()
+      }
+    }
+  }
+  Process {
+    id: shortcutProcess
+    stdout: StdioCollector { id: shortcutStdout; waitForEnd: true }
+    stderr: StdioCollector { id: shortcutStderr; waitForEnd: true }
+    onExited: function(exitCode) {
+      var result = {}
+      try { result = JSON.parse(String(shortcutStdout.text || "{}")) }
+      catch (e) { result = {ok: false, error: String(shortcutStderr.text || e.message)} }
+      if (exitCode !== 0 || result.ok === false) {
+        root.shortcutError = result.error || String(shortcutStderr.text || "Shortcut update failed.").trim()
+        root.shortcutConflictOpen = false
+        if (root.shortcutOperation === "set") root.cancelShortcutCapture()
+        return
+      }
+      if (root.shortcutOperation === "status") {
+        root.shortcutCurrent = result.shortcut || ""
+        root.shortcutLast = result.lastShortcut || "SUPER + SHIFT + D"
+      } else if (root.shortcutOperation === "check") {
+        root.shortcutConflicts = result.conflicts || []
+        if (root.shortcutConflicts.length > 0) root.shortcutConflictOpen = true
+        else root.applyShortcutCandidate()
+      } else if (root.shortcutOperation === "set") {
+        root.shortcutCurrent = result.shortcut || ""
+        root.shortcutLast = result.lastShortcut || result.shortcut || "SUPER + SHIFT + D"
+        root.shortcutError = ""
+        root.shortcutConflictOpen = false
+        root.cancelShortcutCapture()
+        root.shortcutSettingsOpen = false
+        root.successText = "Shortcut updated."
+        successTimer.restart()
+      } else if (root.shortcutOperation === "reset") {
+        root.shortcutCurrent = ""
+        root.shortcutLast = result.lastShortcut || root.shortcutLast
+        root.shortcutError = ""
+        root.shortcutConflictOpen = false
+        root.cancelShortcutCapture()
+        root.shortcutSettingsOpen = false
+        root.successText = "Omarchy's default Docker shortcut restored."
+        successTimer.restart()
+      }
+    }
+  }
 
   FloatingWindow {
+    id: pickerWindow
     visible: root.opened
     title: "Docker Host Picker"
     color: root.panelBackground
@@ -582,13 +737,13 @@ Item {
       id: pickerSurface
       anchors.fill: parent
       color: root.panelBackground
-      visible: !root.showingRequirementIssues
+      visible: !root.showingRequirementIssues && !root.shortcutSettingsOpen
 
       Rectangle {
         id: card
         anchors.centerIn: parent
         width: Math.min(430, parent.width - Style.space(36))
-        height: Math.min(column.implicitHeight + Style.space(48), parent.height - Style.space(48))
+        height: Math.min(column.implicitHeight + footerLabel.implicitHeight + column.spacing + Style.space(48), parent.height - Style.space(48))
         radius: Style.cornerRadius > 0 ? Style.cornerRadius : Style.space(18)
         color: root.panelBackground
         border.color: root.panelBorder
@@ -598,6 +753,7 @@ Item {
           id: column
           anchors.fill: parent
           anchors.margins: Style.space(24)
+          anchors.bottomMargin: Style.space(48)
           spacing: Style.space(12)
 
           Row {
@@ -619,7 +775,7 @@ Item {
             }
             Row {
               id: actionGroup
-              width: Style.space(74)
+              width: Style.space(root.manageHosts ? 74 : 114)
               height: parent.height
               spacing: Style.space(6)
 
@@ -694,6 +850,31 @@ Item {
                   }
                 }
               }
+              Rectangle {
+                visible: !root.manageHosts
+                width: Style.space(34)
+                height: parent.height
+                radius: Style.space(7)
+                color: settingsMouse.containsMouse ? root.hoverBackground : "transparent"
+                border.color: root.shortcutSettingsOpen ? Color.accent : root.panelBorder
+                border.width: 1
+                ToolTip.visible: settingsMouse.containsMouse
+                ToolTip.text: root.shortcutCurrent !== "" ? "Shortcut: " + root.shortcutCurrent : "Shortcut settings"
+                ToolTip.delay: 450
+                Text {
+                  anchors.centerIn: parent
+                  text: "󰒓"
+                  color: root.shortcutSettingsOpen ? Color.accent : root.panelForeground
+                  font.family: Style.font.family
+                  font.pixelSize: Style.font.subtitle
+                }
+                MouseArea {
+                  id: settingsMouse
+                  anchors.fill: parent
+                  hoverEnabled: true
+                  onClicked: root.openShortcutSettings()
+                }
+              }
             }
           }
           Text {
@@ -714,8 +895,9 @@ Item {
             Flickable {
               id: hostFlickable
               width: parent.width
-              implicitHeight: hostRows.naturalHeight
-              height: Math.min(implicitHeight, Math.max(0, card.parent.height - Style.space(96) - headerRow.height - panelTitle.implicitHeight - notificationToast.height - (footerLabel.visible ? footerLabel.implicitHeight : 0) - column.spacing * (footerLabel.visible ? 4 : 3) - hostSection.spacing))
+              // Keep the panel height stable while asynchronous host probes update row status.
+              implicitHeight: Math.min(Style.space(68) * 3 + Style.space(16), Math.max(0, card.parent.height - Style.space(96) - headerRow.height - panelTitle.implicitHeight - notificationToast.height - (footerLabel.visible ? footerLabel.implicitHeight : 0) - column.spacing * 3 - hostSection.spacing))
+              height: implicitHeight
               contentWidth: width
               contentHeight: hostRows.naturalHeight
               clip: true
@@ -1321,15 +1503,22 @@ Item {
             }
           }
 
-          Text {
-            id: footerLabel
-            text: root.pendingAddReturn ? "Esc keep drafts · Click ! to discard all & return" : (root.addingHost ? "Enter test & save · Esc discard draft" : (root.manageHosts ? "Enter test & save · Esc discard edits / return" : "↑ / ↓ select · Enter open · E edit · Esc close"))
-            color: Color.muted
-            font.family: Style.font.family
-            font.pixelSize: Style.font.caption
-            horizontalAlignment: Text.AlignRight
-            width: parent.width
-          }
+        }
+        Text {
+          id: footerLabel
+          anchors.left: parent.left
+          anchors.right: parent.right
+          anchors.bottom: parent.bottom
+          anchors.leftMargin: Style.space(24)
+          anchors.rightMargin: Style.space(24)
+          anchors.bottomMargin: Style.space(24)
+          height: Style.space(18)
+          verticalAlignment: Text.AlignVCenter
+          text: root.pendingAddReturn ? "Esc keep drafts · Click ! to discard all & return" : (root.addingHost ? "Enter test & save · Esc discard draft" : (root.manageHosts ? "Enter test & save · Esc discard edits / return" : "↑ / ↓ select · Enter open · E edit · Esc close"))
+          color: Color.muted
+          font.family: Style.font.family
+          font.pixelSize: Style.font.caption
+          horizontalAlignment: Text.AlignRight
         }
       }
 
@@ -1338,7 +1527,10 @@ Item {
         focus: root.opened && !root.addingHost
         Keys.onPressed: function(event) {
           if (event.key === Qt.Key_Escape) {
-            if (root.addingHost) {
+            if (root.shortcutSettingsOpen) {
+              root.cancelShortcutCapture()
+              root.shortcutSettingsOpen = false
+            } else if (root.addingHost) {
               root.handleAddEscape()
             } else if (root.pendingRemovalId !== "") {
               root.pendingRemovalId = ""
@@ -1558,6 +1750,252 @@ Item {
             root.dismiss()
             event.accepted = true
           }
+        }
+      }
+    }
+
+    Rectangle {
+      id: shortcutSettingsSurface
+      visible: root.shortcutSettingsOpen && root.opened
+      z: 200
+      anchors.fill: parent
+      color: "transparent"
+
+      Rectangle {
+        id: shortcutSettingsCard
+        anchors.centerIn: parent
+        width: card.width
+        height: card.height
+        radius: card.radius
+        color: root.panelBackground
+        border.color: root.panelBorder
+        border.width: 1
+
+        Column {
+          id: shortcutColumn
+          anchors.fill: parent
+          anchors.margins: Style.space(24)
+          anchors.bottomMargin: Style.space(48)
+          spacing: Style.space(12)
+
+          Row {
+            width: parent.width
+            height: Style.space(34)
+            spacing: Style.space(6)
+            Text {
+              width: parent.width - settingsBackButton.width - parent.spacing
+              height: parent.height
+              verticalAlignment: Text.AlignVCenter
+              text: "DOCKER / SHORTCUT"
+              color: Color.muted
+              font.family: Style.font.family
+              font.pixelSize: Style.font.caption
+              font.letterSpacing: 2
+              elide: Text.ElideRight
+            }
+            Rectangle {
+              id: settingsBackButton
+              width: Style.space(34)
+              height: parent.height
+              radius: Style.space(7)
+              color: settingsBackMouse.containsMouse ? root.hoverBackground : "transparent"
+              border.color: Color.accent
+              border.width: 1
+              ToolTip.visible: settingsBackMouse.containsMouse
+              ToolTip.text: "Return to hosts"
+              ToolTip.delay: 450
+              Text {
+                anchors.centerIn: parent
+                text: "󰍃"
+                color: Color.accent
+                font.family: Style.font.family
+                font.pixelSize: Style.font.subtitle
+              }
+              MouseArea {
+                id: settingsBackMouse
+                anchors.fill: parent
+                hoverEnabled: true
+                onClicked: {
+                  root.cancelShortcutCapture()
+                  root.shortcutSettingsOpen = false
+                }
+              }
+            }
+          }
+          Text {
+            width: parent.width
+            text: "Picker shortcut"
+            color: root.panelForeground
+            font.family: Style.font.family
+            font.pixelSize: Style.font.title
+            font.bold: true
+          }
+          Text {
+            width: parent.width
+            text: "Choose a shortcut to open Lazydocker Picker. Reset restores Omarchy's Docker action on Super+Shift+D."
+            color: Color.muted
+            font.family: Style.font.family
+            font.pixelSize: Style.font.bodySmall
+            wrapMode: Text.WrapAtWordBoundaryOrAnywhere
+          }
+          Rectangle {
+            width: parent.width
+            height: Style.space(38)
+            radius: Style.space(8)
+            color: root.hoverBackground
+            border.color: root.panelBorder
+            border.width: 1
+            Row {
+              anchors.fill: parent
+              anchors.leftMargin: Style.space(12)
+              anchors.rightMargin: Style.space(12)
+              spacing: Style.space(8)
+              Text {
+                width: parent.width - shortcutValue.implicitWidth - parent.spacing
+                height: parent.height
+                verticalAlignment: Text.AlignVCenter
+                text: "Current shortcut"
+                color: Color.muted
+                font.family: Style.font.family
+                font.pixelSize: Style.font.bodySmall
+                elide: Text.ElideRight
+              }
+              Text {
+                id: shortcutValue
+                height: parent.height
+                verticalAlignment: Text.AlignVCenter
+                text: root.shortcutCurrent !== "" ? root.shortcutCurrent : "None"
+                color: root.shortcutCurrent !== "" ? Color.accent : Color.muted
+                font.family: Style.font.family
+                font.pixelSize: Style.font.bodySmall
+              }
+            }
+          }
+          Text {
+            visible: root.shortcutError !== ""
+            width: parent.width
+            text: root.shortcutError
+            color: Color.urgent
+            font.family: Style.font.family
+            font.pixelSize: Style.font.bodySmall
+            wrapMode: Text.WrapAtWordBoundaryOrAnywhere
+          }
+          Item {
+            visible: root.shortcutCaptureActive
+            width: parent.width
+            height: Style.space(66)
+            Rectangle {
+              anchors.fill: parent
+              radius: Style.space(8)
+              color: root.hoverBackground
+              border.color: root.shortcutInhibitorReady ? Color.accent : Color.urgent
+              border.width: 1
+            }
+            Text {
+              anchors.centerIn: parent
+              width: parent.width - Style.space(20)
+              text: root.shortcutInhibitorReady ? "Press a combination, e.g. Super + Shift + K" : "Preparing safe shortcut capture…"
+              color: root.panelForeground
+              font.family: Style.font.family
+              font.pixelSize: Style.font.bodySmall
+              horizontalAlignment: Text.AlignHCenter
+              wrapMode: Text.WrapAtWordBoundaryOrAnywhere
+            }
+            Item {
+              id: captureKeys
+              anchors.fill: parent
+              focus: root.shortcutCaptureActive && root.shortcutInhibitorReady
+              Keys.onPressed: function(event) {
+                event.accepted = true
+                if (event.key === Qt.Key_Escape) {
+                  root.cancelShortcutCapture()
+                  return
+                }
+                var combo = root.shortcutFromEvent(event)
+                if (combo !== "") {
+                  root.cancelShortcutCapture()
+                  root.submitShortcutCandidate(combo)
+                } else if (event.key !== Qt.Key_Shift && event.key !== Qt.Key_Control
+                           && event.key !== Qt.Key_Alt && event.key !== Qt.Key_Meta) {
+                  root.cancelShortcutCapture()
+                  root.shortcutError = "Use a modifier with a supported letter, number, function, or navigation key."
+                }
+              }
+            }
+          }
+          Text {
+            visible: root.shortcutConflictOpen
+            width: parent.width
+            text: "That combination is already used by " + root.shortcutConflicts.map(function(item) { return item.description }).join(", ") + ". Replace it? The previous binding will return when you reset or change the picker shortcut."
+            color: Color.urgent
+            font.family: Style.font.family
+            font.pixelSize: Style.font.bodySmall
+            wrapMode: Text.WrapAtWordBoundaryOrAnywhere
+          }
+          Row {
+            width: parent.width
+            spacing: Style.space(8)
+            Rectangle {
+              width: (parent.width - parent.spacing) / 2
+              height: Style.space(38)
+              radius: Style.space(8)
+              color: captureMouse.containsMouse ? root.hoverBackground : "transparent"
+              border.color: Color.accent
+              border.width: 1
+              Text { anchors.centerIn: parent; text: root.shortcutConflictOpen ? "Replace binding" : "Press new shortcut"; color: Color.accent; font.family: Style.font.family; font.pixelSize: Style.font.bodySmall }
+              MouseArea {
+                id: captureMouse
+                anchors.fill: parent
+                hoverEnabled: true
+                enabled: !shortcutProcess.running
+                onClicked: {
+                  if (root.shortcutConflictOpen) root.applyShortcutCandidate(true)
+                  else root.beginShortcutCapture()
+                }
+              }
+            }
+            Rectangle {
+              width: (parent.width - parent.spacing) / 2
+              height: Style.space(38)
+              radius: Style.space(8)
+              color: resetMouse.containsMouse ? root.hoverBackground : "transparent"
+              border.color: root.panelBorder
+              border.width: 1
+              Text { anchors.centerIn: parent; text: root.shortcutConflictOpen ? "Cancel" : "Reset to Omarchy default"; color: root.panelForeground; font.family: Style.font.family; font.pixelSize: Style.font.caption }
+              MouseArea {
+                id: resetMouse
+                anchors.fill: parent
+                hoverEnabled: true
+                enabled: !shortcutProcess.running
+                onClicked: {
+                  if (root.shortcutConflictOpen) {
+                    root.shortcutConflictOpen = false
+                    root.shortcutCandidate = ""
+                  } else {
+                    root.resetShortcut()
+                  }
+                }
+              }
+            }
+          }
+        }
+        Text {
+          id: shortcutFooterLabel
+          anchors.left: parent.left
+          anchors.right: parent.right
+          anchors.bottom: parent.bottom
+          anchors.leftMargin: Style.space(24)
+          anchors.rightMargin: Style.space(24)
+          anchors.bottomMargin: Style.space(24)
+          height: Style.space(18)
+          verticalAlignment: Text.AlignVCenter
+          text: root.shortcutCaptureActive
+            ? "Press a shortcut · Esc cancel capture"
+            : (root.shortcutConflictOpen ? "Choose Replace or Cancel · Esc back to hosts" : "Esc back to hosts")
+          color: Color.muted
+          font.family: Style.font.family
+          font.pixelSize: Style.font.caption
+          horizontalAlignment: Text.AlignRight
         }
       }
     }
