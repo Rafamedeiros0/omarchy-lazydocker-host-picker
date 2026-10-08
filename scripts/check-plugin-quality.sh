@@ -11,6 +11,10 @@ command -v gofmt >/dev/null 2>&1 || {
   echo 'gofmt is required to check the plugin sources.' >&2
   exit 1
 }
+command -v node >/dev/null 2>&1 || {
+  echo 'Node.js is required to test the host configuration model.' >&2
+  exit 1
+}
 
 mapfile -d '' go_files < <(find "$repo_dir/plugin" -type f -name '*.go' -print0 | sort -z)
 if ((${#go_files[@]} == 0)); then
@@ -27,6 +31,7 @@ fi
 cd "$repo_dir"
 GO111MODULE=off go test ./plugin/...
 GO111MODULE=off go vet ./plugin/...
+node tests/host-config-model.test.cjs
 
 mapfile -d '' shell_files < <(
   find "$repo_dir/plugin" "$repo_dir/scripts" -type f -name '*.sh' -print0 | sort -z

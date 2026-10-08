@@ -1,5 +1,6 @@
 import QtQuick
 import Quickshell.Io
+import "HostConfigModel.js" as HostConfigModel
 
 Item {
     id: root
@@ -7,8 +8,8 @@ Item {
     property string configPath: ""
     property string configurationError: ""
     property var hosts: []
-    property var hostsBeforeWrite: []
     property string pendingSuccess: ""
+    property var pendingWrite: null
     property var proxyTestConfig: ({
             "enabled": false
         })
@@ -21,55 +22,12 @@ Item {
 
     function loadConfig(raw) {
         try {
-            var data = JSON.parse(String(raw || "{}"));
-            if (!data || !Array.isArray(data.hosts))
-                throw new Error("Expected a hosts array");
-
-            var parsed = [
-                {
-                    "id": "local",
-                    "name": "This machine",
-                    "dockerHost": "unix:///var/run/docker.sock"
-                }
-            ];
-            var usedIds = ["local"];
-            var usedEndpoints = [];
-            data.hosts.forEach(function (host, index) {
-                if (!host || typeof host.id !== "string" || typeof host.name !== "string" || typeof host.dockerHost !== "string")
-                    throw new Error("Each host needs string id, name, and dockerHost values");
-
-                var id = host.id.trim();
-                var name = host.name.trim();
-                var dockerHost = host.dockerHost.trim();
-                if (!id || !name || !dockerHost)
-                    throw new Error("Host " + (index + 1) + " needs a non-empty id, name, and dockerHost");
-
-                if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(id))
-                    throw new Error("Host IDs must start with a letter or number and contain only letters, numbers, '.', '_' or '-'");
-
-                if (usedIds.indexOf(id) !== -1)
-                    throw new Error("Host id '" + id + "' is duplicated or reserved for the local host");
-
-                if (!/^ssh:\/\/[^/\s?#]+$/.test(dockerHost))
-                    throw new Error("Remote hosts must use an SSH Docker endpoint such as ssh://user@host");
-
-                var endpointKey = dockerHost.toLowerCase();
-                if (usedEndpoints.indexOf(endpointKey) !== -1)
-                    throw new Error("SSH endpoint '" + dockerHost + "' is configured more than once");
-
-                usedIds.push(id);
-                usedEndpoints.push(endpointKey);
-                parsed.push({
-                    "id": id,
-                    "name": name,
-                    "dockerHost": dockerHost
-                });
-            });
-            hosts = parsed;
+            var data = HostConfigModel.parseHostConfig(raw);
+            hosts = data.hosts;
             configurationError = "";
-            if (data.proxyTest !== undefined) {
+            if (data.proxyTest !== undefined)
                 configurationError = parseProxyTestConfig(JSON.stringify(data.proxyTest));
-            } else {
+            else {
                 proxyTestConfig = {
                     "enabled": false
                 };
@@ -119,35 +77,25 @@ Item {
         configFile.reload();
     }
     function useLocalOnly() {
-        hosts = [
-            {
-                "id": "local",
-                "name": "This machine",
-                "dockerHost": "unix:///var/run/docker.sock"
-            }
-        ];
+        hosts = [HostConfigModel.localHost()];
         proxyTestConfig = {
             "enabled": false
         };
         proxyTestConfigLoaded = true;
     }
     function writeHosts(remoteHosts, successMessage) {
-        hostsBeforeWrite = hosts.slice();
-        hosts = [
-            {
-                "id": "local",
-                "name": "This machine",
-                "dockerHost": "unix:///var/run/docker.sock"
-            }
-        ].concat(remoteHosts);
-        pendingSuccess = successMessage;
-        var config = {
-            "hosts": remoteHosts
-        };
-        if (proxyTestConfig.enabled === true)
-            config.proxyTest = proxyTestConfig;
-
-        configFile.setText(JSON.stringify(config, null, 2) + "\n");
+        var transaction;
+        try {
+            transaction = HostConfigModel.prepareWrite(hosts, remoteHosts, proxyTestConfig, successMessage);
+        } catch (e) {
+            saveFailed("Could not save host config: " + e.message);
+            return false;
+        }
+        pendingWrite = transaction;
+        hosts = transaction.hosts;
+        pendingSuccess = transaction.pendingSuccess;
+        configFile.setText(transaction.text);
+        return true;
     }
 
     FileView {
@@ -166,12 +114,17 @@ Item {
         }
         onLoaded: root.loadConfig(text())
         onSaveFailed: function (error) {
-            root.hosts = root.hostsBeforeWrite;
-            root.pendingSuccess = "";
+            if (root.pendingWrite !== null) {
+                var rollback = HostConfigModel.rollbackWrite(root.pendingWrite);
+                root.hosts = rollback.hosts;
+                root.pendingSuccess = rollback.pendingSuccess;
+                root.pendingWrite = null;
+            }
             root.saveFailed("Could not save host config: " + error);
         }
         onSaved: {
             configFile.reload();
+            root.pendingWrite = null;
             if (root.pendingSuccess !== "") {
                 var message = root.pendingSuccess;
                 root.pendingSuccess = "";

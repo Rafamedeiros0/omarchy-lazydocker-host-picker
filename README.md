@@ -80,11 +80,12 @@ The remote-host example is in `config.example.json`; install/copy it to `~/.conf
 
 ### QML layout
 
-`Panel.qml` coordinates plugin lifecycle, notification state, and the picker window. `PickerWindow.qml` composes the floating window, card, and secondary surfaces. `PickerHeader.qml`, `PickerHostSection.qml`, and `PickerKeyboardHandler.qml` split header controls, the host list and notifications, and keyboard flow into focused parts. `HostManager.qml` owns host status, edit and draft state, Docker connection checks, and host mutations. `DockerLauncher.qml` owns local/SSH launches and proxy readiness checks. `HostConfigStore.qml` owns config parsing, validation, atomic writes, and rollback. `ShortcutController.qml` owns shortcut capture and integration commands. Reusable rows and secondary screens live under `plugin/components/`:
+`Panel.qml` coordinates plugin lifecycle, notification state, and the picker window. `PickerWindow.qml` composes the floating window, card, and secondary surfaces. `PickerHeader.qml`, `PickerHostSection.qml`, and `PickerKeyboardHandler.qml` split header controls, the host list and notifications, and keyboard flow into focused parts. `HostManager.qml` owns host status, edit and draft state, Docker connection checks, and host mutations. `DockerLauncher.qml` owns local/SSH launches and proxy readiness checks. `HostConfigModel.js` contains pure host parsing, validation, serialization, and rollback transaction logic; `HostConfigStore.qml` connects that model to atomic `FileView` I/O. `ShortcutController.qml` owns shortcut capture and integration commands. Reusable rows and secondary screens live under `plugin/components/`:
 
 - `HostRow.qml` renders and probes a configured host, including edit and remove actions.
 - `HostDraftRow.qml` contains the inline add-host form for one independent draft.
-- `HostConfigStore.qml` owns the user config file and validates host IDs and SSH endpoints.
+- `HostConfigModel.js` validates and normalizes host IDs and SSH endpoints and prepares safe config writes.
+- `HostConfigStore.qml` loads and saves the user config, using atomic writes and restoring the previous host list on failure.
 - `HostManager.qml` coordinates host status, edits, add-host drafts, and Docker connection checks.
 - `DockerLauncher.qml` starts Lazydocker locally or through the SSH proxy and reports proxy readiness issues.
 - `ShortcutController.qml` handles key capture, conflict checks, and shortcut updates.
@@ -94,7 +95,7 @@ The installer copies the entry point, window, its focused subcomponents, and the
 
 ### Plugin development checks
 
-Run `./scripts/check-plugin-quality.sh` and `./scripts/check-qml-quality.sh` before handing off plugin changes. CI and the pre-commit hook use these same entry points. The plugin check runs Go tests and vet, checks Go formatting, and parses the shell scripts. The QML check uses a pinned Arch toolchain and pinned Omarchy type context in CI. Locally, with a working Docker daemon, it builds and reuses that toolchain from `scripts/qml-quality.Dockerfile`; without Docker, it uses installed Qt tools and Omarchy types from `OMARCHY_QML_COMMONS_DIR`, `OMARCHY_PATH`, or `/usr/share/omarchy`, then falls back to the pinned Omarchy checkout. It prefers Qt 6 tools in `/usr/lib/qt6/bin`; set `QT6_QML_TOOLS_DIR` when they are elsewhere. On Arch, format a file with `/usr/lib/qt6/bin/qmlformat -i plugin/PickerWindow.qml`, then rerun the quality script.
+Run `./scripts/check-plugin-quality.sh` and `./scripts/check-qml-quality.sh` before handing off plugin changes. CI and the pre-commit hook use these same entry points. The plugin check runs Go tests and vet, checks Go formatting and shell syntax, and runs Node tests for host config rules and failed-save rollback. It requires Go and Node.js. The QML check uses a pinned Arch toolchain and pinned Omarchy type context in CI. Locally, with a working Docker daemon, it builds and reuses that toolchain from `scripts/qml-quality.Dockerfile`; without Docker, it uses installed Qt tools and Omarchy types from `OMARCHY_QML_COMMONS_DIR`, `OMARCHY_PATH`, or `/usr/share/omarchy`, then falls back to the pinned Omarchy checkout. It prefers Qt 6 tools in `/usr/lib/qt6/bin`; set `QT6_QML_TOOLS_DIR` when they are elsewhere. On Arch, format a file with `/usr/lib/qt6/bin/qmlformat -i plugin/PickerWindow.qml`, then rerun the quality script.
 
 To block commits when these checks fail, install Lefthook and its repository hook once:
 

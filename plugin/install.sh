@@ -15,6 +15,7 @@ required_files=(
   PickerHeader.qml
   PickerHostSection.qml
   PickerKeyboardHandler.qml
+  components/HostConfigModel.js
   docker-ssh-proxy.go
   docker-ssh-proxy-launcher
   docker-ssh-proxy-linux-amd64
@@ -22,8 +23,8 @@ required_files=(
 for file in "${required_files[@]}"; do
   [[ -f "$plugin_dir/$file" ]] || { printf 'Missing plugin file: %s\n' "$plugin_dir/$file" >&2; exit 1; }
 done
-qml_components=("$plugin_dir"/components/*.qml)
-[[ -f "${qml_components[0]}" ]] || { printf 'Missing QML components in %s/components.\n' "$plugin_dir" >&2; exit 1; }
+component_files=("$plugin_dir"/components/*.qml "$plugin_dir"/components/*.js)
+[[ -f "${component_files[0]}" ]] || { printf 'Missing QML components in %s/components.\n' "$plugin_dir" >&2; exit 1; }
 [[ -f "$plugin_dir/lazydocker-picker-integration-linux-amd64" ]] || { printf 'Build the integration manager binary first.\n' >&2; exit 1; }
 [[ -f "$plugin_dir/integration/main.go" ]] || { printf 'Missing Go integration manager source.\n' >&2; exit 1; }
 
@@ -34,7 +35,7 @@ install -m 0644 "$plugin_dir/PickerWindow.qml" "$plugin_target/PickerWindow.qml"
 install -m 0644 "$plugin_dir/PickerHeader.qml" "$plugin_target/PickerHeader.qml"
 install -m 0644 "$plugin_dir/PickerHostSection.qml" "$plugin_target/PickerHostSection.qml"
 install -m 0644 "$plugin_dir/PickerKeyboardHandler.qml" "$plugin_target/PickerKeyboardHandler.qml"
-for component in "${qml_components[@]}"; do
+for component in "${component_files[@]}"; do
   install -m 0644 "$component" "$plugin_target/components/$(basename -- "$component")"
 done
 install -m 0644 "$plugin_dir/docker-ssh-proxy.go" "$plugin_target/docker-ssh-proxy.go"
