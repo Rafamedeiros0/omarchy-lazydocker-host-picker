@@ -9,19 +9,19 @@ Rectangle {
 
     anchors.fill: parent
     color: Color.menu.scrim
-    visible: controller.notificationExpanded && controller.notificationText !== ""
+    visible: notificationDetails.controller.notificationExpanded && notificationDetails.controller.notificationText !== ""
     z: 100
 
     MouseArea {
         anchors.fill: parent
 
-        onClicked: controller.notificationExpanded = false
+        onClicked: notificationDetails.controller.notificationExpanded = false
     }
     Rectangle {
         id: notificationDetailCard
 
         anchors.centerIn: parent
-        border.color: controller.notificationIsError ? Color.urgent : Color.accent
+        border.color: notificationDetails.controller.notificationIsError ? Color.urgent : Color.accent
         border.width: 1
         color: Color.popups.background
         height: Math.min(parent.height - Style.space(32), detailColumn.implicitHeight + Style.space(32))
@@ -42,11 +42,11 @@ Rectangle {
             spacing: Style.space(10)
 
             Text {
-                color: controller.notificationIsError ? Color.urgent : Color.accent
+                color: notificationDetails.controller.notificationIsError ? Color.urgent : Color.accent
                 font.bold: true
                 font.family: Style.font.family
                 font.pixelSize: Style.font.subtitle
-                text: controller.notificationIsError ? "Error details" : "Notification details"
+                text: notificationDetails.controller.notificationIsError ? "Error details" : "Notification details"
                 width: parent.width
             }
             ScrollView {
@@ -60,26 +60,26 @@ Rectangle {
                 Text {
                     id: detailText
 
-                    color: controller.panelForeground
+                    color: notificationDetails.controller.panelForeground
                     font.family: Style.font.family
                     font.pixelSize: Style.font.bodySmall
-                    text: controller.notificationText
+                    text: notificationDetails.controller.notificationText
                     textFormat: Text.PlainText
                     width: detailScroll.availableWidth
                     wrapMode: Text.WrapAtWordBoundaryOrAnywhere
                 }
             }
             Rectangle {
-                border.color: controller.panelBorder
+                border.color: notificationDetails.controller.panelBorder
                 border.width: 1
-                color: closeDetailsMouse.containsMouse ? controller.hoverBackground : "transparent"
+                color: closeDetailsMouse.containsMouse ? notificationDetails.controller.hoverBackground : "transparent"
                 height: Style.space(34)
                 radius: Style.space(7)
                 width: parent.width
 
                 Text {
                     anchors.centerIn: parent
-                    color: controller.panelForeground
+                    color: notificationDetails.controller.panelForeground
                     font.family: Style.font.family
                     font.pixelSize: Style.font.bodySmall
                     text: "Close"
@@ -90,7 +90,7 @@ Rectangle {
                     anchors.fill: parent
                     hoverEnabled: true
 
-                    onClicked: controller.notificationExpanded = false
+                    onClicked: notificationDetails.controller.notificationExpanded = false
                 }
             }
         }

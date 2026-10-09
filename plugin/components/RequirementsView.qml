@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import qs.Commons
 
@@ -8,16 +10,16 @@ Rectangle {
     property real requiredWindowHeight: Math.max(Style.space(320), Math.min(Style.space(640), issueColumn.implicitHeight + Style.space(96)))
 
     anchors.fill: parent
-    color: controller.panelBackground
-    visible: controller.showingRequirementIssues
+    color: requirementsSurface.controller.panelBackground
+    visible: requirementsSurface.controller.showingRequirementIssues
 
     Rectangle {
         id: requirementCard
 
         anchors.centerIn: parent
-        border.color: controller.panelBorder
+        border.color: requirementsSurface.controller.panelBorder
         border.width: 1
-        color: controller.panelBackground
+        color: requirementsSurface.controller.panelBackground
         height: Math.min(parent.height - Style.space(48), Math.max(Style.space(256), issueColumn.implicitHeight + Style.space(48)))
         radius: Style.cornerRadius > 0 ? Style.cornerRadius : Style.space(18)
         width: Math.min(430, parent.width - Style.space(36))
@@ -41,7 +43,7 @@ Rectangle {
                     text: "!"
                 }
                 Text {
-                    color: controller.panelForeground
+                    color: requirementsSurface.controller.panelForeground
                     font.bold: true
                     font.family: Style.font.family
                     font.pixelSize: Style.font.title
@@ -57,9 +59,11 @@ Rectangle {
                 width: parent.width
 
                 Repeater {
-                    model: controller.requirementIssues
+                    model: requirementsSurface.controller.requirementIssues
 
                     delegate: Item {
+                        id: requirementIssue
+
                         required property string modelData
 
                         height: Math.max(issueBullet.implicitHeight, issueText.implicitHeight)
@@ -80,10 +84,10 @@ Rectangle {
                             Text {
                                 id: issueText
 
-                                color: controller.panelForeground
+                                color: requirementsSurface.controller.panelForeground
                                 font.family: Style.font.family
                                 font.pixelSize: Style.font.body
-                                text: modelData
+                                text: requirementIssue.modelData
                                 width: parent.width - issueBullet.implicitWidth - parent.spacing
                                 wrapMode: Text.WrapAtWordBoundaryOrAnywhere
                             }
@@ -96,16 +100,16 @@ Rectangle {
                 width: 1
             }
             Rectangle {
-                border.color: controller.panelBorder
+                border.color: requirementsSurface.controller.panelBorder
                 border.width: 1
-                color: closeRequirementsMouse.containsMouse ? controller.hoverBackground : "transparent"
+                color: closeRequirementsMouse.containsMouse ? requirementsSurface.controller.hoverBackground : "transparent"
                 height: Style.space(38)
                 radius: Style.space(8)
                 width: parent.width
 
                 Text {
                     anchors.centerIn: parent
-                    color: controller.panelForeground
+                    color: requirementsSurface.controller.panelForeground
                     font.family: Style.font.family
                     font.pixelSize: Style.font.bodySmall
                     text: "Close"
@@ -116,18 +120,18 @@ Rectangle {
                     anchors.fill: parent
                     hoverEnabled: true
 
-                    onClicked: controller.dismiss()
+                    onClicked: requirementsSurface.controller.dismiss()
                 }
             }
         }
     }
     Item {
         anchors.fill: parent
-        focus: controller.opened && controller.showingRequirementIssues
+        focus: requirementsSurface.controller.opened && requirementsSurface.controller.showingRequirementIssues
 
         Keys.onPressed: function (event) {
             if (event.key === Qt.Key_Escape) {
-                controller.dismiss();
+                requirementsSurface.controller.dismiss();
                 event.accepted = true;
             }
         }

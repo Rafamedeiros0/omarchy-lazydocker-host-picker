@@ -83,3 +83,5 @@ Run both quality checks before submitting changes:
 ```
 
 GitHub Actions runs the same checks. Lefthook can run them automatically before each commit; install Lefthook and run `lefthook install` to enable the repository hook.
+
+The plugin quality check requires Go, Node.js, and ShellCheck. On Omarchy, install ShellCheck with `sudo pacman -S shellcheck`.
